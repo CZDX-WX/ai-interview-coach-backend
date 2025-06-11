@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+   mysqldb:
+     image: mysql:8.0
+     container_name: aicoach-mysql
+     restart: unless-stopped
+     environment:
+       MYSQL_ROOT_PASSWORD: 123123
+       MYSQL_DATABASE: aicoach_db
+       MYSQL_USER: aicoach_user
+       MYSQL_PASSWORD: 19991126 # 请替换
+     ports:
+       - "3306:3306"
+     volumes:
+       - mysql_app_data:/var/lib/mysql
+
+volumes:
+  postgres_app_data:
+  # mysql_app_data:

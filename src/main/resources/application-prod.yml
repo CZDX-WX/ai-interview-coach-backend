@@ -1,0 +1,33 @@
+spring:
+  datasource:
+    # 本地开发环境 (Windows, 直连本地MySQL) - 在 application-dev.yml 中配置
+    # 云服务器部署环境 (Ubuntu, 使用Docker中的MySQL) - 在 application-prod.yml 中配置
+    # 这里可以放一些通用配置，或者如果只有一个环境，就直接写在这里
+    # 以下为示例，具体连接信息应放在特定profile的配置文件中
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    password: "123123"
+    type: com.alibaba.druid.pool.DruidDataSource
+    url: jdbc:mysql://localhost:3306/aicoach_db?useSSL=false&useUnicode=true&characterEncoding=utf8
+    username: root
+
+# ===================================================================
+# MyBatis-Plus 配置
+# ===================================================================
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml # XML映射文件位置 (如果使用XML)
+  type-aliases-package: com.czdxwx.aiinterviewcoachbackend.entity # 实体类别名包路径 (替换为您的包名)
+  configuration:
+    map-underscore-to-camel-case: true # 开启驼峰命名转换
+  global-config:
+    db-config:
+      id-type: auto # ID自增策略 (或 assign_id, assign_uuid 等)
+      # table-prefix: tbl_ # 如果表有统一前缀
+      # logic-delete-field: deleted # 逻辑删除字段 (实体类中需要有对应字段和注解)
+      # logic-delete-value: 1 # 逻辑删除值 (标记为已删除)
+      # logic-not-delete-value: 0 # 逻辑未删除值
+
+# 自定义应用属性
+app:
+  file-storage:
+    # 在 Ubuntu 服务器上使用绝对路径
+    upload-dir: /var/data/ai-coach/uploads

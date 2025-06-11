@@ -1,0 +1,71 @@
+server:
+  port: 9090
+  servlet:
+    context-path: /interview-agent
+    encoding:
+      charset: UTF-8
+      force: true
+
+spring:
+  mvc:
+    contentnegotiation:
+      default-content-type: application/json
+  application:
+    name: ai-interview-coach-backend
+  profiles:
+    active: dev
+
+
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 105MB
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    display-request-duration: true
+
+management:
+  health:
+    db:
+      enabled: false # 禁用默认的数据源健康检查
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always # ? when_authorized
+
+logging:
+  level:
+    root: INFO
+    com:
+      czdxwx:
+        aiinterviewcoachbackend: DEBUG
+  file:
+    name: logs/ai-coach-backend.log
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+
+app:
+  jwt:
+    secret: "Ar8l7Jr1RjCIw+BXT6OpOyG4Aso301GtojyZfL9urgHLm3D/uQiCqaR1cHECg4a201bkhm49vboFFt+IMA+OpQ=="
+    expiration-ms: 3600000
+    # refreshExpirationMs: 604800000
+    header: "Authorization"
+    tokenPrefix: "Bearer"
+
+spark:
+  appid: 318bbfa3
+  apikey: fa7392d3ee2c7c8c12bbb10f5b47659f
+  apisecret: OGE5NmU0Yzg1OWY4NmE5ZTZkYWM3ODE0
+  embedding:
+    url: "https://emb-cn-huabei-1:xf-yun:com/"
