@@ -14,15 +14,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class QuestionTag implements Serializable {
-
     private static final long serialVersionUID = 1L;
 
-    /**
-     * 注意：这里没有任何 @TableId 注解。
-     * 字段名通过 MyBatis-Plus 的驼峰转下划线规则，
-     * 自动映射到数据库的 question_id 和 tag_id 列。
-     */
     private Long questionId;
-
     private Long tagId;
 }

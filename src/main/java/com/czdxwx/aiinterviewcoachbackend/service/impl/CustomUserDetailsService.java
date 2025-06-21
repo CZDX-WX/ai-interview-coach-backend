@@ -1,7 +1,8 @@
 package com.czdxwx.aiinterviewcoachbackend.service.impl;
 
+import com.czdxwx.aiinterviewcoachbackend.config.security.CustomUserDetails;
 import com.czdxwx.aiinterviewcoachbackend.entity.User;
-import com.czdxwx.aiinterviewcoachbackend.mapper.mysql.UserMapper;
+import com.czdxwx.aiinterviewcoachbackend.mapper.UserMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.GrantedAuthority;
@@ -57,14 +58,17 @@ public class CustomUserDetailsService implements UserDetailsService {
 
         log.debug("为用户 '{}' 加载的权限: {}", user.getUsername(), grantedAuthorities);
 
-        return new org.springframework.security.core.userdetails.User(
-                user.getUsername(), // **重要**: Spring Security UserDetails 的 username 字段应使用数据库中唯一的用户名
-                user.getPasswordHash(),
-                user.isEnabled(),
-                true, // accountNonExpired
-                true, // credentialsNonExpired
-                true, // accountNonLocked
-                grantedAuthorities
-        );
+
+//        return new org.springframework.security.core.userdetails.User(
+//                user.getUsername(), // **重要**: Spring Security UserDetails 的 username 字段应使用数据库中唯一的用户名
+//                user.getPasswordHash(),
+//                user.isEnabled(),
+//                true, // accountNonExpired
+//                true, // credentialsNonExpired
+//                true, // accountNonLocked
+//                grantedAuthorities
+//        );
+
+        return new CustomUserDetails(user, grantedAuthorities);
     }
 }

@@ -15,15 +15,19 @@ public class WebConfig implements WebMvcConfigurer {
 
     private final Logger log = LoggerFactory.getLogger(WebConfig.class);
 
+    // 从 application.yml 读取文件上传的根目录
     @Value("${app.file-storage.upload-dir}")
     private String uploadDir;
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        // 将 /api/files/** 的URL请求映射到文件系统上的 uploadDir 目录
-        String resourceLocation = "file:" + uploadDir.replace("\\", "/") + "/";
+        // **只需保留这一条规则即可**
+        // 它会将所有 /api/files/ 开头的请求，映射到您服务器上的 uploads 目录
+        // 例如，/api/files/tts_audio/123.mp3 会被映射到 /uploads/tts_audio/123.mp3 文件
+        Path uploadPath = Paths.get(uploadDir);
+        String resourceLocation = uploadPath.toUri().toString();
 
-        log.info("修正后的静态资源映射: /api/files/** -> {}", resourceLocation);
+        log.info("配置统一的静态资源映射: /api/files/** -> {}", resourceLocation);
 
         registry.addResourceHandler("/api/files/**")
                 .addResourceLocations(resourceLocation);

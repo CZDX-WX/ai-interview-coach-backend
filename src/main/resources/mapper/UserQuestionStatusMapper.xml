@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.czdxwx.aiinterviewcoachbackend.mapper.UserQuestionStatusMapper">
+
+    <resultMap id="UserQuestionStatusVOResultMap" type="com.czdxwx.aiinterviewcoachbackend.vo.UserQuestionStatusVO">
+        <id property="id" column="id"/>
+        <result property="userId" column="user_id"/>
+        <result property="questionId" column="question_id"/>
+        <result property="proficiencyStatus" column="proficiency_status"/>
+        <result property="lastPracticedAt" column="last_practiced_at"/>
+        <result property="notes" column="notes"/>
+        <result property="questionText" column="question_text"/>
+        <result property="difficulty" column="difficulty"/>
+        <result property="tags" column="tags_concatenated" typeHandler="com.czdxwx.aiinterviewcoachbackend.config.mybatis.StringToListTypeHandler"/>
+    </resultMap>
+
+    <select id="findPracticeHistoryForUser" resultMap="UserQuestionStatusVOResultMap">
+        SELECT
+            uqs.id,
+            -- 使用 ANY_VALUE 来满足 ONLY_FULL_GROUP_BY 模式
+            ANY_VALUE(uqs.user_id)            AS user_id,
+            ANY_VALUE(uqs.question_id)        AS question_id,
+            ANY_VALUE(uqs.proficiency_status) AS proficiency_status,
+            ANY_VALUE(uqs.last_practiced_at)  AS last_practiced_at,
+            ANY_VALUE(uqs.notes)              AS notes,
+            ANY_VALUE(q.question_text)        AS question_text,
+            ANY_VALUE(q.difficulty)           AS difficulty,
+            GROUP_CONCAT(t.name SEPARATOR ',') AS tags_concatenated
+        FROM
+            user_question_status uqs
+                JOIN
+            questions q ON uqs.question_id = q.id
+                LEFT JOIN
+            question_tags qt ON q.id = qt.question_id
+                LEFT JOIN
+            tags t ON qt.tag_id = t.id
+        WHERE
+            uqs.user_id = #{userId}
+        GROUP BY
+            uqs.id
+        ORDER BY
+            last_practiced_at DESC
+    </select>
+    <select id="findPracticedQuestionIds" resultType="java.lang.Long">
+        SELECT question_id FROM user_question_status
+        WHERE user_id = #{userId}
+        AND question_id IN
+        <foreach item="item" collection="questionIds" open="(" separator="," close=")">
+            #{item}
+        </foreach>
+    </select>
+
+    <select id="countByProficiencyStatus" resultType="java.util.Map">
+        SELECT proficiency_status, COUNT(id) AS count
+        FROM user_question_status
+        WHERE user_id = #{userId}
+        GROUP BY proficiency_status
+    </select>
+
+    <select id="countBookmarked" resultType="java.lang.Long">
+        SELECT COUNT(id)
+        FROM user_question_status
+        WHERE user_id = #{userId} AND is_bookmarked = TRUE
+    </select>
+</mapper>

@@ -23,13 +23,13 @@ import java.util.Objects;
 public class SparkEmbeddingServiceImpl implements EmbeddingService {
     private static final Logger logger = LoggerFactory.getLogger(SparkEmbeddingServiceImpl.class);
 
-    @Value("${spark.appid}")
+    @Value("${spark.embedding.appid}") // 从 spark.embedding 读取
     private String appid;
-    @Value("${spark.apikey}")
+    @Value("${spark.embedding.apikey}") // 从 spark.embedding 读取
     private String apikey;
-    @Value("${spark.apisecret}")
+    @Value("${spark.embedding.apisecret}") // 从 spark.embedding 读取
     private String apisecret;
-    @Value("${spark.embedding.url}")
+    @Value("${spark.embedding.url}") // 从 spark.embedding 读取
     private String embeddingUrl;
 
     // 推荐将 OkHttpClient 和 Gson 作为 Bean 进行管理，这里为保持独立性直接创建
@@ -39,13 +39,14 @@ public class SparkEmbeddingServiceImpl implements EmbeddingService {
 
     @Override
     public float[] getEmbedding(String text) {
+        logger.info("==> EmbeddingService: getEmbedding method called for text: '{}...'", text.substring(0, Math.min(text.length(), 50)));
         if (text == null || text.trim().isEmpty()) {
             throw new IllegalArgumentException("Text to be embedded cannot be null or empty.");
         }
 
         try {
             // 1. 使用 AuthUtils 生成带鉴权的完整 URL
-            String finalUrl = AuthUtils.getAuthUrl(this.embeddingUrl, this.apikey, this.apisecret);
+            String finalUrl = AuthUtils.getAuthUrl(this.embeddingUrl, this.apikey, this.apisecret,"POST");
 
             // 2. 构造请求体，这次传入的是动态文本
             String requestBodyJson = buildRequestBody(text);

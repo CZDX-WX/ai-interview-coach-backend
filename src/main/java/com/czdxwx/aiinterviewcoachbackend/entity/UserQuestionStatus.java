@@ -36,7 +36,8 @@ public class UserQuestionStatus implements Serializable {
 
     @TableField("notes")
     private String notes;
-
+    @TableField("is_bookmarked")
+    private Boolean isBookmarked;
     @TableField(exist = false)
     private static final long serialVersionUID = 1L;
 

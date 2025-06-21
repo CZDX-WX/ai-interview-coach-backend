@@ -3,7 +3,7 @@ package com.czdxwx.aiinterviewcoachbackend.service.impl;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.czdxwx.aiinterviewcoachbackend.entity.UserQuestionStatus;
-import com.czdxwx.aiinterviewcoachbackend.mapper.postgres.UserQuestionStatusMapper;
+import com.czdxwx.aiinterviewcoachbackend.mapper.UserQuestionStatusMapper;
 import com.czdxwx.aiinterviewcoachbackend.service.UserQuestionStatusService;
 import org.springframework.stereotype.Service;
 

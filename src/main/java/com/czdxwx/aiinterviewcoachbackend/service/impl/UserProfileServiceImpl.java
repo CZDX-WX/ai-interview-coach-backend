@@ -3,10 +3,10 @@ package com.czdxwx.aiinterviewcoachbackend.service.impl;
 import com.czdxwx.aiinterviewcoachbackend.config.security.SecurityUtils;
 import com.czdxwx.aiinterviewcoachbackend.entity.Resume;
 import com.czdxwx.aiinterviewcoachbackend.entity.User;
-import com.czdxwx.aiinterviewcoachbackend.mapper.mysql.ForumPostMapper;
-import com.czdxwx.aiinterviewcoachbackend.mapper.mysql.ForumThreadMapper;
-import com.czdxwx.aiinterviewcoachbackend.mapper.mysql.ResumeMapper;
-import com.czdxwx.aiinterviewcoachbackend.mapper.mysql.UserMapper;
+import com.czdxwx.aiinterviewcoachbackend.mapper.ForumPostMapper;
+import com.czdxwx.aiinterviewcoachbackend.mapper.ForumThreadMapper;
+import com.czdxwx.aiinterviewcoachbackend.mapper.ResumeMapper;
+import com.czdxwx.aiinterviewcoachbackend.mapper.UserMapper;
 import com.czdxwx.aiinterviewcoachbackend.service.FileStorageService;
 import com.czdxwx.aiinterviewcoachbackend.service.UserProfileService;
 import com.czdxwx.aiinterviewcoachbackend.service.dto.ChangePasswordRequestDto;
@@ -173,19 +173,34 @@ public class UserProfileServiceImpl implements UserProfileService {
     @Override
     public void deleteResume(Long resumeId) {
         User user = getCurrentUserEntity();
-        Resume resume = resumeMapper.selectById(resumeId);
-        if (resume == null || !resume.getUserId().equals(user.getId())) {
-            throw new IllegalArgumentException("简历未找到或不属于当前用户。");
-        }
-        // 从文件系统删除文件
-        // storagePath 存储的是 "subDirectory/filename.ext"
-        String[] pathParts = resume.getStoragePath().replace("\\", "/").split("/");
-        String subDirectory = pathParts.length > 1 ? pathParts[0] : "";
-        String filenameInFs = pathParts.length > 1 ? pathParts[1] : pathParts[0];
+        log.debug("用户 '{}' 请求删除简历 ID: {}", user.getUsername(), resumeId);
 
-        fileStorageService.delete(subDirectory, filenameInFs);
-        resumeMapper.deleteById(resumeId);
-        log.info("用户 '{}'删除了简历 ID: {}", user.getUsername(), resumeId);
+        Resume resume = resumeMapper.selectById(resumeId);
+
+        // 验证简历是否存在，以及是否属于当前登录用户
+        if (resume == null || !resume.getUserId().equals(user.getId())) {
+            throw new IllegalArgumentException("简历未找到或您没有权限删除该简历。");
+        }
+
+        // **核心修正点**:
+        // resume.getStoragePath() 中存储的已经是我们需要的相对路径 (例如: "resumes/user_1/xxxx.pdf")
+        // 我们直接将这个路径传递给更新后的 delete 方法即可。
+        // 不再需要手动分割路径。
+        try {
+            fileStorageService.delete(resume.getStoragePath());
+            log.info("已从文件系统删除简历文件: {}", resume.getStoragePath());
+        } catch (RuntimeException e) {
+            // 即使文件删除失败，也记录错误并继续删除数据库记录，避免留下孤立的文件引用
+            log.error("从文件系统删除简历文件 {} 时失败，但将继续从数据库删除记录。", resume.getStoragePath(), e);
+        }
+
+        // 从数据库中删除记录
+        int deletedRows = resumeMapper.deleteById(resumeId);
+        if (deletedRows > 0) {
+            log.info("用户 '{}' 已成功删除简历记录 (ID: {})。", user.getUsername(), resumeId);
+        } else {
+            log.warn("尝试从数据库删除简历记录 (ID: {}) 失败，可能已被删除。", resumeId);
+        }
     }
 
     @Override

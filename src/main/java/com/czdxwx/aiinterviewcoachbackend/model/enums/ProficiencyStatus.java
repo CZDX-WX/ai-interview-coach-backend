@@ -1,7 +1,7 @@
 package com.czdxwx.aiinterviewcoachbackend.model.enums;
 
 public enum ProficiencyStatus {
-    PRACTICED,      // 已做过
-    NEEDS_REVIEW,   // 需要复习
-    MASTERED        // 已掌握
+    NOT_PRACTICED, // 【新增】未学习状态
+    NEEDS_REVIEW,  // 待复习
+    MASTERED       // 已掌握
 }

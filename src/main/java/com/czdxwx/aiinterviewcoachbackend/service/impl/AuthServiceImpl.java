@@ -1,10 +1,11 @@
 package com.czdxwx.aiinterviewcoachbackend.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.czdxwx.aiinterviewcoachbackend.config.security.CustomUserDetails;
 import com.czdxwx.aiinterviewcoachbackend.config.security.JwtTokenProvider;
 import com.czdxwx.aiinterviewcoachbackend.entity.User;
-import com.czdxwx.aiinterviewcoachbackend.mapper.mysql.UserAuthorityMapper;
-import com.czdxwx.aiinterviewcoachbackend.mapper.mysql.UserMapper;
+import com.czdxwx.aiinterviewcoachbackend.mapper.UserAuthorityMapper;
+import com.czdxwx.aiinterviewcoachbackend.mapper.UserMapper;
 import com.czdxwx.aiinterviewcoachbackend.service.AuthService;
 import com.czdxwx.aiinterviewcoachbackend.service.dto.AuthResponseDto;
 import com.czdxwx.aiinterviewcoachbackend.service.dto.LoginRequestDto;
@@ -15,6 +16,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -22,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class AuthServiceImpl implements AuthService {
@@ -32,7 +35,6 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager; // 用于登录认证
     private final JwtTokenProvider jwtTokenProvider;       // 用于生成Token
-
     private final UserAuthorityMapper userAuthorityMapper; // 直接注入 Mapper
 
     public AuthServiceImpl(UserMapper userMapper,
@@ -109,59 +111,34 @@ public class AuthServiceImpl implements AuthService {
     @Transactional(readOnly = true)
     public AuthResponseDto login(LoginRequestDto loginRequestDto) {
         log.info("尝试为 '{}' 进行认证", loginRequestDto.getUsernameOrEmail());
-        Authentication authentication;
-        try {
-            authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(
-                            loginRequestDto.getUsernameOrEmail(),
-                            loginRequestDto.getPassword()
-                    )
-            );
-            log.info("认证成功: {}", authentication.getName());
-        } catch (org.springframework.security.core.AuthenticationException e) {
-            log.error("认证失败: {}", e.getMessage());
-            throw e; // 重新抛出，让 Controller 捕获特定认证异常
-        }
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                        loginRequestDto.getUsernameOrEmail(),
+                        loginRequestDto.getPassword()
+                )
+        );
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
         log.debug("SecurityContext已设置");
 
-        String jwt;
-        try {
-            jwt = jwtTokenProvider.generateToken(authentication);
-            log.info("JWT 生成成功: {}...", jwt.substring(0, Math.min(jwt.length(), 20))); // 只打印部分token
-        } catch (Exception e) {
-            log.error("生成JWT时发生错误: {}", e.getMessage(), e);
-            throw new RuntimeException("生成认证令牌失败。", e); // 抛出更具体的异常
-        }
+        String jwt = jwtTokenProvider.generateToken(authentication);
+        log.info("JWT 生成成功");
 
-        org.springframework.security.core.userdetails.User springUser =
-                (org.springframework.security.core.userdetails.User) authentication.getPrincipal();
-        log.debug("从Principal获取的Spring Security用户名: {}", springUser.getUsername());
+        // **核心修正点**: 将 Principal 转换为我们自己的 CustomUserDetails
+        CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
 
-        User user = userMapper.findOneByUsernameWithAuthorities(springUser.getUsername())
-                .orElseThrow(() -> {
-                    log.error("登录后无法通过用户名 '{}' 重新找到用户信息", springUser.getUsername());
-                    // 这个异常会被外面的 catch (Exception e) 捕获，并返回“登录过程中发生未知错误。”
-                    return new RuntimeException("登录成功，但无法检索用户详细信息。");
-                });
-        log.debug("成功重新获取User领域对象: {}", user.getUsername());
+        // **优化**: 不再需要重新查询数据库！所有需要的信息都在 userDetails 中
+        log.info("用户 '{}' 登录流程即将完成，准备返回 DTO", userDetails.getUsername());
 
-        Set<String> authoritiesFromUserObject = user.getAuthorities();
-        if (authoritiesFromUserObject == null) { // 确保 authorities 不是 null
-            authoritiesFromUserObject = java.util.Collections.emptySet();
-            log.warn("用户 {} 的 authorities 字段为 null，已设置为空集合", user.getUsername());
-        }
-
-
-        log.info("用户 '{}' 登录流程即将完成，准备返回AuthResponseDto", user.getUsername());
         return new AuthResponseDto(
                 jwt,
-                user.getId(),
-                user.getUsername(),
-                user.getEmail(),
-                user.getFullName(),
-                authoritiesFromUserObject
+                String.valueOf(userDetails.getId()), // 直接从 userDetails 获取 ID
+                userDetails.getUsername(),
+                userDetails.getEmail(),
+                userDetails.getFullName(),
+                userDetails.getAuthorities().stream()
+                        .map(GrantedAuthority::getAuthority)
+                        .collect(Collectors.toSet())
         );
     }
 }

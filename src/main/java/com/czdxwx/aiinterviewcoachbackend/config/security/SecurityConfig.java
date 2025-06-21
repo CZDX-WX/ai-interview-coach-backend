@@ -16,6 +16,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.channel.ChannelProcessingFilter;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -60,6 +61,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authz -> authz
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers("/api/admin/**").permitAll()
                         .requestMatchers("/api/auth/**", "/api/public/**", "/api/files/**", "/actuator/**", "/v3/api-docs/**", "/swagger-ui/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/discussion/**").permitAll()
                         // 方案B（更推荐）：如果这些接口需要登录后才能访问
@@ -67,7 +69,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/questions/**").authenticated()
                         .anyRequest().authenticated()
                 );
-
+// 【核心】将我们的日志“哨兵”过滤器，放在整个Spring Security过滤器链的最前面
+        http.addFilterBefore(new RequestLoggingFilter(), ChannelProcessingFilter.class);
         // **核心修正点 3**: 将手动创建的 filter 实例添加到过滤器链中
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 

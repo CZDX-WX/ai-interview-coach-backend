@@ -9,39 +9,18 @@
 spring:
   # 数据源配置
   datasource:
-    # --- MySQL 数据源 (主数据源，用于用户系统) ---
-    mysql:
-      # 【重要】指定连接池类型为 Druid
-      type: com.alibaba.druid.pool.DruidDataSource
-      driver-class-name: com.mysql.cj.jdbc.Driver
-      url: jdbc:mysql://localhost:3306/aicoach_db_dev?useSSL=false&useUnicode=true&characterEncoding=utf8
-      username: root
-      password: "jstbb520"
-      # Druid 特定配置
-      druid:
-        initial-size: 5
-        min-idle: 5
-        max-active: 20
-        max-wait: 60000
-
-    # --- PostgreSQL 数据源 (用于新功能) ---
-    postgres:
-      # 【重要】指定连接池类型为 Druid
-      type: com.alibaba.druid.pool.DruidDataSource
-      driver-class-name: org.postgresql.Driver
-      url: jdbc:postgresql://localhost:5432/interview_db
-      username: postgres
-      password: "123123"
-      # Druid 特定配置
-      druid:
-        initial-size: 5
-        min-idle: 5
-        max-active: 20
-        max-wait: 60000
-
-    # --- 【可选但强烈推荐】开启 Druid 的监控功能 ---
+    # 【重要】指定连接池类型为 Druid
+    type: com.alibaba.druid.pool.DruidDataSource
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/aicoach_db_dev?useSSL=false&useUnicode=true&characterEncoding=utf8
+    username: root
+    password: "jstbb520"
+    # Druid 特定配置
     druid:
-      # 开启内置的监控页面
+      initial-size: 5
+      min-idle: 5
+      max-active: 20
+      max-wait: 60000
       stat-view-servlet:
         enabled: true
         url-pattern: /druid/* # 访问路径，例如 http://localhost:8080/druid

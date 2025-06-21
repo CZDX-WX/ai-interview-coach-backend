@@ -11,13 +11,13 @@ import java.util.Set;
 public class AuthResponseDto {
     private String accessToken;
     private String tokenType = "Bearer";
-    private Long userId;
+    private String userId;
     private String username;
     private String email;
     private String fullName;
     private Set<String> authorities;
 
-    public AuthResponseDto(String jwt, Long id, String username, String email, String fullName, Set<String> collect) {
+    public AuthResponseDto(String jwt, String id, String username, String email, String fullName, Set<String> collect) {
         this.accessToken = jwt;
         this.userId = id;
         this.username = username;

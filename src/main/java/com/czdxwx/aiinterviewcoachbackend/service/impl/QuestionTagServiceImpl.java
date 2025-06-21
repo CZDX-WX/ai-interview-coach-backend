@@ -2,7 +2,7 @@ package com.czdxwx.aiinterviewcoachbackend.service.impl;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.czdxwx.aiinterviewcoachbackend.entity.QuestionTag;
-import com.czdxwx.aiinterviewcoachbackend.mapper.postgres.QuestionTagMapper;
+import com.czdxwx.aiinterviewcoachbackend.mapper.QuestionTagMapper;
 import com.czdxwx.aiinterviewcoachbackend.service.QuestionTagService;
 import org.springframework.stereotype.Service;
 
