@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 @Service
 public class MilvusService {
@@ -45,8 +46,8 @@ public class MilvusService {
     private String token;
     @Value("${milvus.collection.questions}")
     private String questionsCollectionName;
-    @Value("${milvus.collection.tags}")
-    private String tagsCollectionName;
+//    @Value("${milvus.collection.tags}")
+//    private String tagsCollectionName;
     @Value("${milvus.collection.dimension}")
     private Integer dimension;
 
@@ -55,10 +56,10 @@ public class MilvusService {
     @PostConstruct
     private void init() {
         String uri = "https://" + host;
-        final ConnectConfig connectConfig = ConnectConfig.builder().uri(uri).token(token).build();
+        final ConnectConfig connectConfig = ConnectConfig.builder().uri(uri).token(token).connectTimeoutMs(10000).build();
         this.milvusClient = new MilvusClientV2(connectConfig);
         ensureCollectionExists(questionsCollectionName, "question_id", "question_vector");
-        ensureCollectionExists(tagsCollectionName, "tag_id", "tag_vector");
+//        ensureCollectionExists(tagsCollectionName, "tag_id", "tag_vector");
     }
 
     // --- 公开业务方法 ---
@@ -70,47 +71,6 @@ public class MilvusService {
         return search(questionsCollectionName, "question_id", vector, topK);
     }
 
-    public void insertTagVector(Long tagId, List<Float> vector) {
-        insert(tagsCollectionName, "tag_id", "tag_vector", tagId, vector);
-    }
-
-    public List<SearchResp.SearchResult> searchTags(List<Float> vector, int topK) {
-        return search(tagsCollectionName, "tag_id", vector, topK);
-    }
-
-    /**
-     * 【基于源码的最终修正版】根据主键ID列表，批量获取向量。
-     */
-    public List<List<Float>> getVectorsByIds(String collectionName, String pkFieldName, List<Long> ids) {
-        if (ids == null || ids.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        GetReq getReq = GetReq.builder()
-                .collectionName(collectionName)
-                .ids(new ArrayList<>(ids)) // 转换为 List<Object>
-                .outputFields(List.of("vector"))
-                .build();
-
-        // 【修正】直接接收 GetResp，不再有R<>包装器，也不再需要 check() 或 RpcUtils
-        GetResp getResp = milvusClient.get(getReq);
-
-        List<List<Float>> vectors = new ArrayList<>();
-
-        if (getResp != null && getResp.getGetResults() != null) {
-            // 【修正】根据您提供的 QueryResult 源码，使用 .getEntity() 获取数据
-            for (QueryResp.QueryResult queryResult : getResp.getGetResults()) {
-                Map<String, Object> entityMap = queryResult.getEntity();
-                if (entityMap != null && entityMap.containsKey("vector")) {
-                    Object vectorData = entityMap.get("vector");
-                    if (vectorData instanceof List) {
-                        vectors.add((List<Float>) vectorData);
-                    }
-                }
-            }
-        }
-        return vectors;
-    }
 
     // --- 私有辅助方法 ---
 

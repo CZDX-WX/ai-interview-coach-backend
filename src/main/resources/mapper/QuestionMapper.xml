@@ -2,6 +2,152 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.czdxwx.aiinterviewcoachbackend.mapper.QuestionMapper">
 
+    <resultMap id="QuestionVOMap" type="com.czdxwx.aiinterviewcoachbackend.vo.QuestionVO">
+        <id property="id" column="id"/>
+        <result property="questionText" column="question_text"/>
+        <result property="referenceAnswer" column="reference_answer"/>
+        <result property="speechSynthesisContent" column="speech_synthesis_content"/>
+        <result property="difficulty" column="difficulty"/>
+        <result property="ownerId" column="owner_id"/>
+        <result property="questionHash" column="question_hash"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="speechAudioUrl" column="speech_audio_url"/>
+        <result property="proficiencyStatus" column="proficiency_status"/>
+        <result property="isBookmarked" column="is_bookmarked"/>
+        <result property="tags" column="tags" typeHandler="com.czdxwx.aiinterviewcoachbackend.config.mybatis.StringToListTypeHandler"/>
+    </resultMap>
+
+    <sql id="searchWhereClause">
+        <where>
+            <choose>
+                <when test="request.userId != null">(q.owner_id IS NULL OR q.owner_id = #{request.userId})</when>
+                <otherwise>q.owner_id IS NULL</otherwise>
+            </choose>
+
+            <if test="request.practiceStatus != null and request.practiceStatus != 'ALL'">
+                <choose>
+                    <when test="request.practiceStatus == 'NOT_PRACTICED'">
+                        AND (
+                        NOT EXISTS (
+                        SELECT 1 FROM user_question_status uqs
+                        WHERE uqs.question_id = q.id AND uqs.user_id = #{request.userId}
+                        )
+                        OR
+                        EXISTS (
+                        SELECT 1 FROM user_question_status uqs
+                        WHERE uqs.question_id = q.id AND uqs.user_id = #{request.userId} AND uqs.proficiency_status = 'NOT_PRACTICED'
+                        )
+                        )
+                    </when>
+                    <when test="request.practiceStatus == 'BOOKMARKED'">
+                        AND uqs_filter.is_bookmarked = TRUE
+                    </when>
+                    <otherwise> AND uqs_filter.proficiency_status = #{request.practiceStatus}
+                    </otherwise>
+                </choose>
+            </if>
+
+            <if test="request.roleId != null">
+                AND rt_filter.role_id = #{request.roleId}
+            </if>
+
+            <if test="request.difficulty != null and request.difficulty != ''">
+                AND q.difficulty = #{request.difficulty}
+            </if>
+        </where>
+    </sql>
+
+    <select id="searchQuestionIds" resultType="java.lang.Long">
+        SELECT DISTINCT q.id
+        FROM questions q
+        <if test="request.practiceStatus != null and request.practiceStatus != 'ALL' and request.practiceStatus != 'NOT_PRACTICED'">
+            JOIN user_question_status uqs_filter ON q.id = uqs_filter.question_id AND uqs_filter.user_id = #{request.userId}
+        </if>
+        <if test="request.isBookmarked == true">
+            <if test="request.practiceStatus == null or request.practiceStatus == 'ALL' or request.practiceStatus == 'NOT_PRACTICED'">
+                JOIN user_question_status uqs_filter ON q.id = uqs_filter.question_id AND uqs_filter.user_id = #{request.userId}
+            </if>
+        </if>
+        <if test="request.roleId != null or (request.tagNames != null and !request.tagNames.isEmpty())">
+            JOIN question_tags qt_filter ON q.id = qt_filter.question_id
+            JOIN tags t_filter ON qt_filter.tag_id = t_filter.id
+        </if>
+        <if test="request.roleId != null">
+            JOIN role_tags rt_filter ON t_filter.id = rt_filter.tag_id
+        </if>
+
+        <include refid="searchWhereClause"/>
+
+        <if test="request.tagNames != null and !request.tagNames.isEmpty()">
+            AND t_filter.name IN
+            <foreach item="item" collection="request.tagNames" open="(" separator="," close=")">
+                #{item}
+            </foreach>
+        </if>
+        ORDER BY q.id DESC
+    </select>
+
+    <select id="findAllQuestionIdsByAllTags" resultType="java.lang.Long">
+        SELECT q.id
+        FROM questions q
+        JOIN question_tags qt_filter ON q.id = qt_filter.question_id
+        JOIN tags t_filter ON qt_filter.tag_id = t_filter.id
+        <if test="request.practiceStatus != null and request.practiceStatus != 'ALL' and request.practiceStatus != 'NOT_PRACTICED'">
+            JOIN user_question_status uqs_filter ON q.id = uqs_filter.question_id AND uqs_filter.user_id = #{request.userId}
+        </if>
+        <if test="request.isBookmarked == true">
+            <if test="request.practiceStatus == null or request.practiceStatus == 'ALL' or request.practiceStatus == 'NOT_PRACTICED'">
+                JOIN user_question_status uqs_filter ON q.id = uqs_filter.question_id AND uqs_filter.user_id = #{request.userId}
+            </if>
+        </if>
+        <if test="request.roleId != null">
+            JOIN role_tags rt_filter ON t_filter.id = rt_filter.tag_id
+        </if>
+
+        <include refid="searchWhereClause"/>
+
+        <if test="request.tagNames != null and !request.tagNames.isEmpty()">
+            AND t_filter.name IN
+            <foreach item="item" collection="request.tagNames" open="(" separator="," close=")">
+                #{item}
+            </foreach>
+        </if>
+        GROUP BY q.id
+        <if test="request.tagNames != null and !request.tagNames.isEmpty()">
+            HAVING COUNT(DISTINCT t_filter.id) = ${request.tagNames.size()}
+        </if>
+        ORDER BY q.id DESC
+    </select>
+
+    <select id="findVosByIds" resultMap="QuestionVOMap">
+        SELECT
+        q.id, q.question_text, q.reference_answer, q.speech_synthesis_content, q.difficulty,
+        q.owner_id, q.question_hash, q.created_at, q.speech_audio_url,
+        uqs.proficiency_status,
+        uqs.is_bookmarked,
+        GROUP_CONCAT(t.name SEPARATOR ',') AS tags
+        FROM
+        questions q
+        LEFT JOIN
+        question_tags qt ON q.id = qt.question_id
+        LEFT JOIN
+        tags t ON qt.tag_id = t.id
+        LEFT JOIN
+        user_question_status uqs ON q.id = uqs.question_id AND uqs.user_id = #{userId}
+        WHERE
+        q.id IN
+        <foreach item="item" collection="ids" open="(" separator="," close=")">
+            #{item}
+        </foreach>
+        GROUP BY
+        q.id, uqs.proficiency_status, uqs.is_bookmarked
+        ORDER BY FIELD(q.id,
+        <foreach item="item" collection="ids" separator=",">
+            #{item}
+        </foreach>
+        )
+    </select>
+
     <select id="findPageWithTags" resultMap="QuestionVOMap">
             SELECT
             q.id, q.question_text, q.reference_answer, q.speech_synthesis_content, q.difficulty, q.owner_id, q.question_hash, q.created_at, q.speech_audio_url,
@@ -59,138 +205,6 @@
     </select>
 
 
-    <resultMap id="QuestionVOMap" type="com.czdxwx.aiinterviewcoachbackend.vo.QuestionVO">
-        <id property="id" column="id"/>
-        <result property="questionText" column="question_text"/>
-        <result property="referenceAnswer" column="reference_answer"/>
-        <result property="speechSynthesisContent" column="speech_synthesis_content"/>
-        <result property="difficulty" column="difficulty"/>
-        <result property="ownerId" column="owner_id"/>
-        <result property="questionHash" column="question_hash"/>
-        <result property="createdAt" column="created_at"/>
-        <result property="speechAudioUrl" column="speech_audio_url"/>
-        <result property="tags" column="tags" typeHandler="com.czdxwx.aiinterviewcoachbackend.config.mybatis.StringToListTypeHandler"/>
-    </resultMap>
-
-    <select id="searchQuestionIds" resultType="java.lang.Long">
-        SELECT
-        q.id
-        FROM
-        questions q
-        <where>
-            <choose>
-                <when test="request.userId != null">
-                    (q.owner_id IS NULL OR q.owner_id = #{request.userId})
-                </when>
-                <otherwise>
-                    q.owner_id IS NULL
-                </otherwise>
-            </choose>
-
-            <if test="request.practiceStatus != null and request.practiceStatus != 'ALL'">
-                <choose>
-                    <when test="request.practiceStatus == 'NOT_PRACTICED'">
-                        AND (
-                        -- 情况A: 题目对用户可见，但在status表中完全没有该用户的记录
-                        NOT EXISTS (
-                        SELECT 1 FROM user_question_status uqs
-                        WHERE uqs.question_id = q.id AND uqs.user_id = #{request.userId}
-                        )
-                        OR
-                        -- 情况B: 题目在status表中有记录，但状态明确为 NOT_PRACTICED
-                        EXISTS (
-                        SELECT 1 FROM user_question_status uqs
-                        WHERE uqs.question_id = q.id AND uqs.user_id = #{request.userId} AND uqs.proficiency_status = 'NOT_PRACTICED'
-                        )
-                        )
-                    </when>
-                    <when test="request.practiceStatus == 'BOOKMARKED'">
-                        AND EXISTS (
-                        SELECT 1 FROM user_question_status uqs
-                        WHERE uqs.question_id = q.id AND uqs.user_id = #{request.userId} AND uqs.is_bookmarked = TRUE
-                        )
-                    </when>
-                    <otherwise> AND EXISTS (
-                        SELECT 1 FROM user_question_status uqs
-                        WHERE uqs.question_id = q.id AND uqs.user_id = #{request.userId} AND uqs.proficiency_status = #{request.practiceStatus}
-                        )
-                    </otherwise>
-                </choose>
-            </if>
-
-            <if test="request.roleId != null">
-                AND EXISTS (
-                SELECT 1 FROM question_tags qt
-                JOIN role_tags rt ON qt.tag_id = rt.tag_id
-                WHERE qt.question_id = q.id AND rt.role_id = #{request.roleId}
-                )
-            </if>
-
-            <if test="request.tagNames != null and !request.tagNames.isEmpty()">
-                <if test="request.searchMode.name() == 'ANY_TAG'">
-                    AND EXISTS (
-                    SELECT 1 FROM question_tags qt
-                    JOIN tags t ON qt.tag_id = t.id
-                    WHERE qt.question_id = q.id AND t.name IN
-                    <foreach item="item" collection="request.tagNames" open="(" separator="," close=")">
-                        #{item}
-                    </foreach>
-                    )
-                </if>
-                <if test="request.searchMode.name() == 'ALL_TAGS'">
-                    AND q.id IN (
-                    SELECT question_id
-                    FROM question_tags
-                    WHERE tag_id IN (SELECT id FROM tags WHERE name IN
-                    <foreach item="item" collection="request.tagNames" open="(" separator="," close=")">
-                        #{item}
-                    </foreach>
-                    )
-                    GROUP BY question_id
-                    HAVING COUNT(DISTINCT tag_id) = #{request.tagNames.size()}
-                    )
-                </if>
-            </if>
-
-            <if test="request.difficulty != null and request.difficulty != ''">
-                AND q.difficulty = #{request.difficulty}
-            </if>
-        </where>
-        ORDER BY q.id DESC
-    </select>
-
-    <select id="findVosByIds" resultMap="QuestionVOMap">
-        SELECT
-        q.id, q.question_text, q.reference_answer, q.speech_synthesis_content, q.difficulty,
-        q.owner_id, q.question_hash, q.created_at, q.speech_audio_url,
-
-        -- 从 user_question_status 表中查询出用户的个人状态
-        uqs.proficiency_status,
-        uqs.is_bookmarked,
-
-        GROUP_CONCAT(t.name SEPARATOR ',') AS tags
-        FROM
-        questions q
-        LEFT JOIN
-        question_tags qt ON q.id = qt.question_id
-        LEFT JOIN
-        tags t ON qt.tag_id = t.id
-        LEFT JOIN
-        user_question_status uqs ON q.id = uqs.question_id AND uqs.user_id = #{userId}
-        WHERE
-        q.id IN
-        <foreach item="item" collection="ids" open="(" separator="," close=")">
-            #{item}
-        </foreach>
-        GROUP BY
-        q.id, uqs.proficiency_status, uqs.is_bookmarked
-        ORDER BY FIELD(q.id,
-        <foreach item="item" collection="ids" separator=",">
-            #{item}
-        </foreach>
-        )
-    </select>
-
     <select id="countVisibleQuestions" resultType="java.lang.Long">
         SELECT COUNT(id) FROM questions
         <where>
@@ -203,24 +217,5 @@
         </where>
     </select>
 
-    <select id="countByProficiencyStatus" resultType="java.util.Map">
-        SELECT
-            proficiency_status,
-            COUNT(id) AS count
-        FROM
-            user_question_status
-        WHERE
-            user_id = #{userId}
-        GROUP BY
-            proficiency_status
-    </select>
 
-    <select id="countBookmarked" resultType="java.lang.Long">
-        SELECT
-            COUNT(id)
-        FROM
-            user_question_status
-        WHERE
-            user_id = #{userId} AND is_bookmarked = TRUE
-    </select>
 </mapper>

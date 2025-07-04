@@ -9,6 +9,7 @@ import com.czdxwx.aiinterviewcoachbackend.mapper.TagMapper;
 import com.czdxwx.aiinterviewcoachbackend.service.dto.QuestionSearchRequest;
 import com.czdxwx.aiinterviewcoachbackend.vo.QuestionVO;
 import lombok.RequiredArgsConstructor;
+import org.mybatis.spring.SqlSessionTemplate;
 import org.springframework.beans.BeanUtils;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -23,16 +24,6 @@ public class QuestionQueryService {
 
     private final QuestionMapper questionMapper;
     private final TagMapper tagMapper;
-    private final ObjectMapper objectMapper = new ObjectMapper();
-
-    /**
-     * 分页获取所有题目（包含标签）
-     */
-    public IPage<QuestionVO> findAllPaginated(int current, int size) {
-        Page<QuestionVO> page = new Page<>(current, size);
-        // 【核心修正】传入一个空的 QueryWrapper 作为第二个参数，以匹配 Mapper 方法的签名
-        return questionMapper.findPageWithTags(page, new QueryWrapper<>());
-    }
 
     /**
      * 根据ID获取单个题目详情（包含标签）
@@ -67,28 +58,79 @@ public class QuestionQueryService {
         return questionMapper.findPageWithTags(page, queryWrapper);
     }
 
-    /**
-     * 【核心修正】统一的、强大的题目搜索方法，采用两步查询法
-     */
     @Cacheable(value = "questionSearchResults", key = "#request.toString()")
     public IPage<QuestionVO> searchQuestions(QuestionSearchRequest request) {
-        // 1. 第一步：分页查询出符合条件的题目ID，这部分不变
-        Page<Long> page = new Page<>(request.getCurrent(), request.getSize());
-        IPage<Long> idPage = questionMapper.searchQuestionIds(page, request);
+        IPage<QuestionVO> finalPage;
 
-        if (CollectionUtils.isEmpty(idPage.getRecords())) {
-            return new Page<>(idPage.getCurrent(), idPage.getSize(), 0);
+        // 【核心】根据 searchMode 采用不同的分页策略
+        if (request.getSearchMode() == QuestionSearchRequest.SearchMode.ALL_TAGS) {
+            // 对于 ALL_TAGS，采用手动分页
+            finalPage = executeManualPagination(request);
+        } else {
+            // 对于 ANY_TAG 和其他情况，使用MyBatis-Plus自动分页
+            finalPage = executeAutoPagination(request);
         }
-
-        // 2. 第二步：根据ID列表，查询这些题目的完整信息
-        List<Long> questionIds = idPage.getRecords();
-        // 【核心修改】将 userId 传递给 findVosByIds 方法
-        List<QuestionVO> questionVos = questionMapper.findVosByIds(questionIds, request.getUserId());
-
-        // 3. 手动组装最终的分页结果并返回
-        IPage<QuestionVO> finalPage = new Page<>(idPage.getCurrent(), idPage.getSize(), idPage.getTotal());
-        finalPage.setRecords(questionVos);
 
         return finalPage;
     }
+
+    /**
+     * [私有] 自动分页逻辑（用于简单查询）
+     */
+    private IPage<QuestionVO> executeAutoPagination(QuestionSearchRequest request) {
+        Page<Long> page = new Page<>(request.getCurrent(), request.getSize());
+        IPage<Long> idPage = questionMapper.searchQuestionIds(page, request);
+        return fetchDetailsForPage(idPage, request.getUserId());
+    }
+
+    /**
+     * [私有] 手动分页逻辑（用于ALL_TAGS这个复杂查询）
+     */
+    private IPage<QuestionVO> executeManualPagination(QuestionSearchRequest request) {
+        // 1. 获取所有符合条件的ID
+        List<Long> allMatchingIds = questionMapper.findAllQuestionIdsByAllTags(request);
+
+        long total = allMatchingIds.size();
+        IPage<QuestionVO> pageResult = new Page<>(request.getCurrent(), request.getSize(), total);
+
+        if (total == 0) {
+            pageResult.setRecords(Collections.emptyList());
+            return pageResult;
+        }
+
+        // 2. 在Java内存中计算分页
+        long fromIndex = (long) (request.getCurrent() - 1) * request.getSize();
+        if (fromIndex >= total) {
+            pageResult.setRecords(Collections.emptyList());
+            return pageResult;
+        }
+        long toIndex = Math.min(fromIndex + request.getSize(), total);
+        List<Long> idsForCurrentPage = allMatchingIds.subList((int)fromIndex, (int)toIndex);
+
+        // 3. 查询当前页ID的详情
+        if(CollectionUtils.isEmpty(idsForCurrentPage)){
+            pageResult.setRecords(Collections.emptyList());
+            return pageResult;
+        }
+        List<QuestionVO> questionVos = questionMapper.findVosByIds(idsForCurrentPage, request.getUserId());
+        pageResult.setRecords(questionVos);
+
+        return pageResult;
+    }
+
+    /**
+     * [私有] 封装了“两步查询法”的第二步
+     */
+    private IPage<QuestionVO> fetchDetailsForPage(IPage<Long> idPage, Long userId) {
+        if (CollectionUtils.isEmpty(idPage.getRecords())) {
+            return new Page<>(idPage.getCurrent(), idPage.getSize(), idPage.getTotal());
+        }
+        List<Long> questionIds = idPage.getRecords();
+        List<QuestionVO> questionVos = questionMapper.findVosByIds(questionIds, userId);
+        IPage<QuestionVO> finalPage = new Page<>(idPage.getCurrent(), idPage.getSize(), idPage.getTotal());
+        finalPage.setRecords(questionVos);
+        return finalPage;
+    }
+
+
 }

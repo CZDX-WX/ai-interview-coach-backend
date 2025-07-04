@@ -4,37 +4,55 @@ package com.czdxwx.aiinterviewcoachbackend.service;
 import com.czdxwx.aiinterviewcoachbackend.entity.Tag;
 import com.czdxwx.aiinterviewcoachbackend.service.dto.TagCreateRequest;
 import com.czdxwx.aiinterviewcoachbackend.service.dto.TagSuggestionResponse;
+import com.czdxwx.aiinterviewcoachbackend.vo.TagInRoleVO;
 
 import java.util.List;
 
 public interface TagService {
-    /**
-     * 获取用户可见的标签列表
-     */
-    List<Tag> getTags(Long userId, Long roleId);
 
     /**
-     * 为新标签提供智能建议
+     * 获取所有公共标签
      */
-    TagSuggestionResponse suggest(String tagName, Long userId);
+    List<Tag> getPublicTags();
 
     /**
-     * 创建用户个性化标签
+     * 获取指定角色关联的所有公共标签
      */
-    Tag create(TagCreateRequest request, Long userId);
+    List<Tag> getPublicTagsByRoleId(Long roleId);
 
     /**
-     * [供内部使用] 为生成流程解析并关联标签
+     * 获取指定用户的私有标签
+     */
+    List<Tag> getPrivateTagsForUser(Long userId);
+
+    /**
+     * 创建一个公共标签 (管理员权限)
+     */
+    Tag createPublicTag(TagCreateRequest request);
+
+    /**
+     * 为指定用户创建一个私有标签
+     */
+    Tag createPrivateTag(TagCreateRequest request, Long userId);
+
+    /**
+     * 将一个标签关联到一个岗位 (管理员权限)
+     */
+    void associateTagToRole(Long roleId, Long tagId);
+
+    /**
+     * 删除一个公共标签 (管理员权限)
+     */
+    void deletePublicTag(Long tagId);
+
+    /**
+     * 删除一个用户的私有标签
+     */
+    void deletePrivateTag(Long tagId, Long userId);
+
+
+    /**
+     * 生成题目中为题目绑定标签
      */
     void resolveAndAssociateTags(List<String> tagNames, Long questionId, Long ownerId, Long roleId);
-
-    /**
-     * [供内部使用] 根据一批标签名，获取它们对应的向量
-     */
-    List<List<Float>> getVectorsByTagNames(List<String> tagNames);
-
-    /**
-     * 【新增】根据题目ID获取其所有标签名
-     */
-    List<String> getTagsByQuestionId(Long questionId);
 }
